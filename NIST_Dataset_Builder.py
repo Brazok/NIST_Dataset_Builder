@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import json
+import subprocess
 import tkinter as tk
 from tkinter import Canvas, ttk
 import requests
@@ -8,9 +9,12 @@ import zipfile
 from tqdm import tqdm
 import os
 import random
+import shutil
 
 CRITERIAS_FILE_PATH = "./criterias_data.json"
 OUTPUT_PATH = "./_output/"
+BIN_PATH = "./_output/bin/"
+SCRIPT_PATH = "./script/"
 
 def getCriteriasFromAPI():
     print("~> getCriteriasFromAPI()")
@@ -86,6 +90,7 @@ def download_file(_name, _ext, _download_link):
 
     if not os.path.exists(OUTPUT_PATH):
         os.makedirs(OUTPUT_PATH)
+        os.makedirs(OUTPUT_PATH + 'bin')
 
     file_name = OUTPUT_PATH + _name + _ext
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.82 Safari/537.36'}  # Add your headers here
@@ -111,6 +116,45 @@ def unzip_file(_name:str):
     with zipfile.ZipFile(file_name, 'r') as zip_ref:
         zip_ref.extractall(OUTPUT_PATH + _name)
     os.remove(file_name)
+
+def looking_for_std_thread(_identifier:str):
+    print("~> looking_for_std_thread()")
+    path = OUTPUT_PATH + _identifier
+    for root, dirs, files in os.walk(path):  # Remplacer '.' par le chemin de votre répertoire de départ si nécessaire
+        for file in files:
+            if file == 'std_thread.c':
+                file_path = os.path.join(root, file)
+                print(f'Modification du fichier : {file_path}')
+                remove_try_except(file_path)
+
+def remove_try_except(file_path):
+    print("~> remove_try_except()")
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    new_lines = []
+    inside_try_block = False
+    inside_except_block = False
+
+    for line in lines:
+        if '__try {' in line:
+            inside_try_block = True
+            continue  # Ne pas ajouter cette ligne
+        elif inside_try_block and '} __except' in line:
+            inside_try_block = False
+            inside_except_block = True
+            continue  # Ne pas ajouter cette ligne
+        elif inside_except_block:
+            if '}' in line:
+                inside_except_block = False
+            continue  # Ignorer les lignes à l'intérieur du bloc __except
+        elif inside_try_block:
+            new_lines.append(line)  # Ajouter les lignes à l'intérieur du bloc __try
+        else:
+            new_lines.append(line)
+
+    with open(file_path, 'w') as file:
+        file.writelines(new_lines)
 
 def window():
     def on_combobox_changed(event):
@@ -149,6 +193,7 @@ def window():
                     break
                 download_file(file['identifier'], ".zip", file['download'])
                 unzip_file(file['identifier'])
+                looking_for_std_thread(file['identifier'])
                 count += 1
         else:
             print("Random")
@@ -164,9 +209,52 @@ def window():
                 testCases = result['testCases']
                 random_file = random.randint(0, len(testCases)-1)   
                 file = testCases[random_file]
-                download_file(file['identifier'], ".zip", file['download'])
-                unzip_file(file['identifier'])
+                identifier = file['identifier']
+
+                download_file(identifier, ".zip", file['download'])
+                unzip_file(identifier)
+
+                looking_for_std_thread(identifier)
+
+                src_makefile = os.path.abspath('./Makefile')
+                dest_dir = os.path.abspath(OUTPUT_PATH + identifier)
+                dest_makefile = os.path.join(dest_dir, 'Makefile')
+
+                if os.path.isfile(src_makefile):
+                    try:
+                        shutil.copyfile(src_makefile, dest_makefile)
+                    except FileNotFoundError as e:
+                        print(f"Erreur: le fichier n'a pas été trouvé - {e}")
+                    except Exception as e:
+                        print(f"Erreur lors de la copie du fichier: {e}")
+                    else:
+                        print("Makefile copié avec succès.")
+                else:
+                    print(f"Le fichier source Makefile n'existe pas: {src_makefile}")
+
+                # Même si la copie échoue, continuez avec les autres opérations
+                try:
+                    subprocess.call(['make', '-C', dest_dir])
+                    print("End of compilation")
+                except Exception as e:
+                    print(f"Erreur lors de l'exécution de make: {e}")
+
+                try:
+                    print("Désass de ./output/" + identifier + ".exe")
+                    command = ["./run_ghidra_headless.sh", BIN_PATH + identifier + ".exe", SCRIPT_PATH + "bin2asm.py"]
+                    subprocess.run(command)
+                    print("End of decompilation")
+                except Exception as e:
+                    print(f"Erreur lors de l'exécution de decompiled.py: {e}")
+                    
+                # try:
+                #     print("Décompilation de ./output/" + identifier + ".exe")
+                #     command = ["./run_ghidra_headless.sh", BIN_PATH + identifier + ".exe", SCRIPT_PATH + "bin2c.py"]
+                #     subprocess.run(command)
+                # except Exception as e:
+                #     print(f"Erreur lors de l'exécution de getAsm.py: {e}")
                 count += 1
+
 
 
 
