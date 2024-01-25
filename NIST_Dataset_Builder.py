@@ -20,7 +20,7 @@ BIN_PATH =  TMP_PATH + "bin/"
 DOWNLOAD_PATH = TMP_PATH + "download/"
 
 OUTPUT_PATH = "./output/"
-SCRIPT_PATH = "./script/"
+SCRIPT_PATH = "./"
 
 
 
@@ -253,29 +253,19 @@ def window():
                     print(f"Erreur lors de l'exécution de make: {e}")
 
                 print("\n\n")
-                # try:
-                #     print(f"Déssas : {identifier}.exe")
-                #     command = ["./run_ghidra_headless.sh", BIN_PATH + identifier + ".exe", SCRIPT_PATH + "bin2asm.py"]
-                #     subprocess.run(command)
-                #     print("End of disassembly")
-                # except Exception as e:
-                #     print(f"Erreur lors de l'exécution de getAsm.py: {e}")
-                    
-                # try:
-                #     print(f"Décompilation : {identifier}.exe")
-                #     command = ["./run_ghidra_headless.sh", BIN_PATH + identifier + ".exe", SCRIPT_PATH + "bin2c.py"]
-                #     subprocess.run(command)
-                #     print("End of decompilation")
-                # except Exception as e:
-                #     print(f"Erreur lors de l'exécution de getDecompile.py: {e}")
+
+                args = ""
+                if isAsm.get() == 1:
+                    args += "asm "
+                if isDecompile.get() == 1:
+                    args += "decompile "
 
                 try:
-                    print(f"Décompilation + Déssasembly : {identifier}.exe")
-                    command = ["./run_ghidra_headless.sh", BIN_PATH + identifier + ".exe", SCRIPT_PATH + "disasAndDecomp.py"]
+                    print(f"Charging : {identifier}.exe")
+                    command = ["./run_ghidra_headless.sh", BIN_PATH + identifier + ".exe", SCRIPT_PATH + f"script4ghidra.py {args}"]
                     subprocess.run(command)
-                    print("End of decompilation + disassembly")
                 except Exception as e:
-                    print(f"Erreur lors de l'exécution de disasAndDecomp.py: {e}")
+                    print(f"Erreur lors de l'exécution de run_ghidra_headless.sh: {e}")
                 count += 1
                 print("\n\n")
 
@@ -376,11 +366,26 @@ def window():
     isRandom = tk.IntVar()
     random_bouton = tk.Checkbutton(root, text="Random", variable=isRandom, name="random")
     random_bouton.grid(row=row, column=column)  # Use grid instead of pack
+    random_bouton.select()
 
     # Create a button - Download
     row += 1
     download_button = tk.Button(root, text="Download", command=on_download)
     download_button.grid(row=row, column=column)  # Use grid instead of pack
+
+    # Create a button - Asm
+    row += 1
+    isAsm = tk.IntVar()
+    asm_bouton = tk.Checkbutton(root, text="Asm", variable=isAsm, name="asm")
+    asm_bouton.grid(row=row, column=column)  # Use grid instead of pack
+    asm_bouton.select()
+
+    # Create a button - Decompile
+    row += 1
+    isDecompile = tk.IntVar()
+    decompile_bouton = tk.Checkbutton(root, text="Decompile", variable=isDecompile, name="decompile")
+    decompile_bouton.grid(row=row, column=column)  # Use grid instead of pack
+    decompile_bouton.select()
 
 
     root.mainloop()
