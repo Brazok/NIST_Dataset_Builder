@@ -2,28 +2,23 @@
 
 GHIDRA_PATH="/home/pascal/Downloads/_ISEN/_MASTER_PROJECT/ghidra-master/ghidra_11.1_DEV"
 
-if [ "$#" -lt 2 ]
-then 
-    echo "$0 <binary path> <script path> [--noAnalysis] [--time]"
+if [ "$1" == "--clean" ]
+then
+    rm -rf tmp_ghidra_project*
     exit
 fi
 
-NOANALYSIS=""
-if [ "$3" = "--noAnalysis" ]
-then
-    NOANALYSIS="-noanalysis"
+if [ "$#" -lt 2 ]
+then 
+    echo "$0 <binary path> <script path>"
+    exit
 fi
 
-TIME=""
-if [ "$4" = "--time" ]
-then
-    TIME="time"
-fi
 
-#run ghidra
-$TIME $GHIDRA_PATH/support/analyzeHeadless . tmp_ghidra_project \
+
+echo "Running Ghidra headless on $1 with script $2"
+$GHIDRA_PATH/support/analyzeHeadless . tmp_ghidra_project \
 -import "$1" \
 -postscript "$2" \
 -deleteProject \
--overwrite \
-$NOANALYSIS
+-overwrite 

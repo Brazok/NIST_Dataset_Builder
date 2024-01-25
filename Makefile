@@ -26,7 +26,8 @@ CXXOBJECTS = $(CXXSOURCES:.cpp=.o)
 CURRENT_DIR = $(notdir $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST))))))
 
 # Nom de l'exécutable basé sur le nom du dossier courant
-OUTPUT = ../bin/$(CURRENT_DIR).exe
+BIN_DIR = ../../bin
+OUTPUT = $(BIN_DIR)/$(CURRENT_DIR).exe
 
 # La cible par défaut
 all: $(OUTPUT)

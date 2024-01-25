@@ -10,11 +10,25 @@ from tqdm import tqdm
 import os
 import random
 import shutil
+import sys
+import argparse
 
-CRITERIAS_FILE_PATH = "./criterias_data.json"
-OUTPUT_PATH = "./_output/"
-BIN_PATH = "./_output/bin/"
+TMP_PATH = "./tmp/"
+
+CRITERIAS_FILE_PATH = TMP_PATH + "criterias_data.json"
+BIN_PATH =  TMP_PATH + "bin/"
+DOWNLOAD_PATH = TMP_PATH + "download/"
+
+OUTPUT_PATH = "./output/"
 SCRIPT_PATH = "./script/"
+
+
+
+def clean():
+    print("~> clean()")
+    if os.path.exists(TMP_PATH):
+        shutil.rmtree(TMP_PATH)
+        print("TMP_PATH deleted")
 
 def getCriteriasFromAPI():
     print("~> getCriteriasFromAPI()")
@@ -42,7 +56,6 @@ def getCriteriasFromFile():
         except Exception as e:
             print(f"Failed to update criterias : {e}")
             return None
-
 
 def upadteCriteriasFile():
     print("~> upadteCriteriasFile()")
@@ -88,11 +101,7 @@ def download_file(_name, _ext, _download_link):
     print("~> download_file()")
     print(f"Downloading {_name}{_ext} / {_download_link}")
 
-    if not os.path.exists(OUTPUT_PATH):
-        os.makedirs(OUTPUT_PATH)
-        os.makedirs(OUTPUT_PATH + 'bin')
-
-    file_name = OUTPUT_PATH + _name + _ext
+    file_name = DOWNLOAD_PATH + _name + _ext
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.82 Safari/537.36'}  # Add your headers here
     response = requests.get(_download_link, stream=True, headers=headers)
 
@@ -112,14 +121,14 @@ def download_file(_name, _ext, _download_link):
 def unzip_file(_name:str):
     print("~> unzip_file()")
     print(f"Unzipping {_name}.zip")
-    file_name = OUTPUT_PATH + _name + ".zip"
+    file_name = DOWNLOAD_PATH + _name + ".zip"
     with zipfile.ZipFile(file_name, 'r') as zip_ref:
-        zip_ref.extractall(OUTPUT_PATH + _name)
+        zip_ref.extractall(DOWNLOAD_PATH + _name)
     os.remove(file_name)
 
 def looking_for_std_thread(_identifier:str):
     print("~> looking_for_std_thread()")
-    path = OUTPUT_PATH + _identifier
+    path = DOWNLOAD_PATH + _identifier
     for root, dirs, files in os.walk(path):  # Remplacer '.' par le chemin de votre répertoire de départ si nécessaire
         for file in files:
             if file == 'std_thread.c':
@@ -212,12 +221,15 @@ def window():
                 identifier = file['identifier']
 
                 download_file(identifier, ".zip", file['download'])
+                print("\n\n")
                 unzip_file(identifier)
+                print("\n\n")
 
                 looking_for_std_thread(identifier)
+                print("\n\n")
 
                 src_makefile = os.path.abspath('./Makefile')
-                dest_dir = os.path.abspath(OUTPUT_PATH + identifier)
+                dest_dir = os.path.abspath(DOWNLOAD_PATH + identifier)
                 dest_makefile = os.path.join(dest_dir, 'Makefile')
 
                 if os.path.isfile(src_makefile):
@@ -232,6 +244,7 @@ def window():
                 else:
                     print(f"Le fichier source Makefile n'existe pas: {src_makefile}")
 
+                print("\n\n")
                 # Même si la copie échoue, continuez avec les autres opérations
                 try:
                     subprocess.call(['make', '-C', dest_dir])
@@ -239,21 +252,32 @@ def window():
                 except Exception as e:
                     print(f"Erreur lors de l'exécution de make: {e}")
 
-                try:
-                    print("Désass de ./output/" + identifier + ".exe")
-                    command = ["./run_ghidra_headless.sh", BIN_PATH + identifier + ".exe", SCRIPT_PATH + "bin2asm.py"]
-                    subprocess.run(command)
-                    print("End of decompilation")
-                except Exception as e:
-                    print(f"Erreur lors de l'exécution de decompiled.py: {e}")
-                    
+                print("\n\n")
                 # try:
-                #     print("Décompilation de ./output/" + identifier + ".exe")
-                #     command = ["./run_ghidra_headless.sh", BIN_PATH + identifier + ".exe", SCRIPT_PATH + "bin2c.py"]
+                #     print(f"Déssas : {identifier}.exe")
+                #     command = ["./run_ghidra_headless.sh", BIN_PATH + identifier + ".exe", SCRIPT_PATH + "bin2asm.py"]
                 #     subprocess.run(command)
+                #     print("End of disassembly")
                 # except Exception as e:
                 #     print(f"Erreur lors de l'exécution de getAsm.py: {e}")
+                    
+                # try:
+                #     print(f"Décompilation : {identifier}.exe")
+                #     command = ["./run_ghidra_headless.sh", BIN_PATH + identifier + ".exe", SCRIPT_PATH + "bin2c.py"]
+                #     subprocess.run(command)
+                #     print("End of decompilation")
+                # except Exception as e:
+                #     print(f"Erreur lors de l'exécution de getDecompile.py: {e}")
+
+                try:
+                    print(f"Décompilation + Déssasembly : {identifier}.exe")
+                    command = ["./run_ghidra_headless.sh", BIN_PATH + identifier + ".exe", SCRIPT_PATH + "disasAndDecomp.py"]
+                    subprocess.run(command)
+                    print("End of decompilation + disassembly")
+                except Exception as e:
+                    print(f"Erreur lors de l'exécution de disasAndDecomp.py: {e}")
                 count += 1
+                print("\n\n")
 
 
 
@@ -364,5 +388,36 @@ def window():
 
 
 if __name__ == "__main__":
-    print("~> __main__()")
+    parser = argparse.ArgumentParser(description='Script to download NIST dataset')
+    parser.add_argument( '-c', '--clean', action='store_true', help='clean tmp folder')
+    parser.add_argument('-u', '--update',  action='store_true', help='update criterias file')
+
+    args = parser.parse_args()
+
+    if args.clean:
+        print("Cleaning tmp folder...")
+        clean()
+        exit()
+
+    print("Checking if paths exists")
+    if not os.path.exists(OUTPUT_PATH):
+        os.makedirs(OUTPUT_PATH)
+
+    if not os.path.exists(TMP_PATH):
+        os.makedirs(TMP_PATH)
+    
+    if not os.path.exists(BIN_PATH):
+        os.makedirs(BIN_PATH)
+    
+    if not os.path.exists(DOWNLOAD_PATH):
+        os.makedirs(DOWNLOAD_PATH)
+
+    if args.update:
+        print("Updating criterias file...")
+        upadteCriteriasFile()
+    
+    if not os.path.exists(CRITERIAS_FILE_PATH):
+        print("Criterias file not found, updating...")
+        upadteCriteriasFile()
+
     window()
