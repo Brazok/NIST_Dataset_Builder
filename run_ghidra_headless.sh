@@ -33,10 +33,10 @@ then
     arg2="$4"
 fi
 
-
+rand=$((1 + $RANDOM % 1000))
 
 echo "Running Ghidra headless on $1 with script $2"
-$GHIDRA_PATH/support/analyzeHeadless ./tmp tmp_ghidra_project \
+$GHIDRA_PATH/support/analyzeHeadless ./tmp "tmp_ghidra_project_$rand" \
 -import "$1" \
 -postscript $2 $arg1 $arg2 \
 -deleteProject \

@@ -12,6 +12,8 @@ import random
 import shutil
 import sys
 import argparse
+import logging
+import threading
 
 TMP_PATH = "./tmp/"
 
@@ -22,6 +24,29 @@ DOWNLOAD_PATH = TMP_PATH + "download/"
 OUTPUT_PATH = "./output/"
 SCRIPT_PATH = "./"
 
+def check_pre_requisites():
+    print("~> check_pre_requisites()")
+    check_folders()
+    check_criterias_file()
+
+def check_criterias_file():
+    print("~> check_criterias_file()")
+    if not os.path.exists(CRITERIAS_FILE_PATH):
+        print("Criterias file not found, updating...")
+        upadteCriteriasFile()
+
+def check_folders():
+    if not os.path.exists(OUTPUT_PATH):
+        os.makedirs(OUTPUT_PATH)
+
+    if not os.path.exists(TMP_PATH):
+        os.makedirs(TMP_PATH)
+    
+    if not os.path.exists(BIN_PATH):
+        os.makedirs(BIN_PATH)
+    
+    if not os.path.exists(DOWNLOAD_PATH):
+        os.makedirs(DOWNLOAD_PATH)
 
 
 def clean():
@@ -166,8 +191,15 @@ def remove_try_except(file_path):
         file.writelines(new_lines)
 
 def window():
+    def on_clean():
+        print("~~> on_clean()")
+        clean()
+
     def on_combobox_changed(event):
         print("~~> on_combobox_changed()")
+
+        check_pre_requisites()
+
         arr = []
         for name, combobox in comboboxes.items():
             arr.append({ "nom": name, "value": combobox.get() })
@@ -188,11 +220,16 @@ def window():
 
     def on_download():
         print("~~> on_download()")
+
+        check_pre_requisites()
+
         arr = []
         for name, combobox in comboboxes.items():
             arr.append({ "nom": name, "value": combobox.get() })
         print(isRandom.get())
         result = getFileListFromAPI(arr, comboLimit.get(), page_spin.get())
+        
+
         if isRandom.get() == 0:
             print("Not Random")
             testCases = result['testCases']
@@ -200,76 +237,85 @@ def window():
             for file in testCases:
                 if count == int(dlFiles_spin.get()):
                     break
-                download_file(file['identifier'], ".zip", file['download'])
-                unzip_file(file['identifier'])
-                looking_for_std_thread(file['identifier'])
+                process_file(file)
                 count += 1
         else:
             print("Random")
-            total = result['total']
             pageCount = result['pageCount']
             count = 0
 
-            while True:
-                if count == int(dlFiles_spin.get()):
-                    break   
+            while count != int(dlFiles_spin.get()):
                 random_page = random.randint(1, pageCount)
                 result = getFileListFromAPI(arr, comboLimit.get(), str(random_page))
                 testCases = result['testCases']
                 random_file = random.randint(0, len(testCases)-1)   
                 file = testCases[random_file]
-                identifier = file['identifier']
 
-                download_file(identifier, ".zip", file['download'])
-                print("\n\n")
-                unzip_file(identifier)
-                print("\n\n")
+                format = "%(asctime)s: %(message)s"
+                logging.basicConfig(format=format, level=logging.INFO,
+                                    datefmt="%H:%M:%S")
 
-                looking_for_std_thread(identifier)
-                print("\n\n")
-
-                src_makefile = os.path.abspath('./Makefile')
-                dest_dir = os.path.abspath(DOWNLOAD_PATH + identifier)
-                dest_makefile = os.path.join(dest_dir, 'Makefile')
-
-                if os.path.isfile(src_makefile):
-                    try:
-                        shutil.copyfile(src_makefile, dest_makefile)
-                    except FileNotFoundError as e:
-                        print(f"Erreur: le fichier n'a pas été trouvé - {e}")
-                    except Exception as e:
-                        print(f"Erreur lors de la copie du fichier: {e}")
-                    else:
-                        print("Makefile copié avec succès.")
-                else:
-                    print(f"Le fichier source Makefile n'existe pas: {src_makefile}")
-
-                print("\n\n")
-                # Même si la copie échoue, continuez avec les autres opérations
-                try:
-                    subprocess.call(['make', '-C', dest_dir])
-                    print("End of compilation")
-                except Exception as e:
-                    print(f"Erreur lors de l'exécution de make: {e}")
-
-                print("\n\n")
-
-                args = ""
-                if isAsm.get() == 1:
-                    args += "asm "
-                if isDecompile.get() == 1:
-                    args += "decompile "
-
-                try:
-                    print(f"Charging : {identifier}.exe")
-                    command = ["./run_ghidra_headless.sh", BIN_PATH + identifier + ".exe", SCRIPT_PATH + f"script4ghidra.py {args}"]
-                    subprocess.run(command)
-                except Exception as e:
-                    print(f"Erreur lors de l'exécution de run_ghidra_headless.sh: {e}")
+                logging.info("Main    : before creating thread")
+                x = threading.Thread(target=process_file, args=(file,))
+                logging.info("Main    : before running thread")
+                x.start()
+                logging.info("Main    : wait for the thread to finish")
+                # x.join()
+                logging.info("Main    : all done")
+                # process_file(file)
                 count += 1
-                print("\n\n")
 
+    def process_file(file):
+        check_pre_requisites()
 
+        identifier = file['identifier']
+        download_file(identifier, ".zip", file['download'])
+        print("\n\n")
+        unzip_file(identifier)
+        print("\n\n")
+
+        looking_for_std_thread(identifier)
+        print("\n\n")
+
+        src_makefile = os.path.abspath('./Makefile')
+        dest_dir = os.path.abspath(DOWNLOAD_PATH + identifier)
+        dest_makefile = os.path.join(dest_dir, 'Makefile')
+
+        if os.path.isfile(src_makefile):
+            try:
+                shutil.copyfile(src_makefile, dest_makefile)
+            except FileNotFoundError as e:
+                print(f"Erreur: le fichier n'a pas été trouvé - {e}")
+            except Exception as e:
+                print(f"Erreur lors de la copie du fichier: {e}")
+            else:
+                print("Makefile copié avec succès.")
+        else:
+            print(f"Le fichier source Makefile n'existe pas: {src_makefile}")
+
+        print("\n\n")
+        # Même si la copie échoue, continuez avec les autres opérations
+        try:
+            subprocess.call(['make', '-C', dest_dir])
+            print("End of compilation")
+        except Exception as e:
+            print(f"Erreur lors de l'exécution de make: {e}")
+
+        print("\n\n")
+
+        args = ""
+        if isAsm.get() == 1:
+            args += "asm "
+        if isDecompile.get() == 1:
+            args += "decompile "
+
+        try:
+            print(f"Charging : {identifier}.exe")
+            command = ["./run_ghidra_headless.sh", BIN_PATH + identifier + ".exe", SCRIPT_PATH + f"script4ghidra.py {args}"]
+            subprocess.run(command)
+        except Exception as e:
+            print(f"Erreur lors de l'exécution de run_ghidra_headless.sh: {e}")
+        print("\n\n")
 
 
     print("~> window()")
@@ -348,6 +394,10 @@ def window():
     data_frame = tk.Frame(root, bd=2, relief="groove")
     data_frame.grid(row=row, column=column, columnspan=4, rowspan=9 ,sticky="nsew")
 
+    # Create a button - Clean
+    download_button = tk.Button(root, text="Clean", command=on_clean)
+    download_button.grid(row=2, column=5)  # Use grid instead of pack
+
     # Create a label - Downloader
     column = 5
     page_label = tk.Label(root, text="Downloader")
@@ -368,11 +418,6 @@ def window():
     random_bouton.grid(row=row, column=column)  # Use grid instead of pack
     random_bouton.select()
 
-    # Create a button - Download
-    row += 1
-    download_button = tk.Button(root, text="Download", command=on_download)
-    download_button.grid(row=row, column=column)  # Use grid instead of pack
-
     # Create a button - Asm
     row += 1
     isAsm = tk.IntVar()
@@ -387,6 +432,11 @@ def window():
     decompile_bouton.grid(row=row, column=column)  # Use grid instead of pack
     decompile_bouton.select()
 
+    # Create a button - Download
+    row += 1
+    download_button = tk.Button(root, text="Download", command=on_download)
+    download_button.grid(row=row, column=column)  # Use grid instead of pack
+
 
     root.mainloop()
 
@@ -396,6 +446,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Script to download NIST dataset')
     parser.add_argument( '-c', '--clean', action='store_true', help='clean tmp folder')
     parser.add_argument('-u', '--update',  action='store_true', help='update criterias file')
+    parser.add_argument('-d', '--deepClean',  action='store_true', help='clean output folder')
+
 
     args = parser.parse_args()
 
@@ -404,25 +456,18 @@ if __name__ == "__main__":
         clean()
         exit()
 
-    print("Checking if paths exists")
-    if not os.path.exists(OUTPUT_PATH):
-        os.makedirs(OUTPUT_PATH)
+    if args.deepClean:
+        print("Cleaning output folder...")
+        clean()
+        if os.path.exists(OUTPUT_PATH):
+            shutil.rmtree(OUTPUT_PATH)
+            print("OUTPUT_PATH deleted")
+        exit()
 
-    if not os.path.exists(TMP_PATH):
-        os.makedirs(TMP_PATH)
-    
-    if not os.path.exists(BIN_PATH):
-        os.makedirs(BIN_PATH)
-    
-    if not os.path.exists(DOWNLOAD_PATH):
-        os.makedirs(DOWNLOAD_PATH)
+    check_folders()
 
     if args.update:
         print("Updating criterias file...")
         upadteCriteriasFile()
     
-    if not os.path.exists(CRITERIAS_FILE_PATH):
-        print("Criterias file not found, updating...")
-        upadteCriteriasFile()
-
     window()
