@@ -14,6 +14,7 @@ import sys
 import argparse
 import logging
 import threading
+import json
 
 TMP_PATH = "./tmp/"
 
@@ -268,6 +269,8 @@ def window():
     def process_file(file):
         check_pre_requisites()
 
+        # print(f"Processing {file}")
+
         identifier = file['identifier']
         download_file(identifier, ".zip", file['download'])
         print("\n\n")
@@ -303,6 +306,26 @@ def window():
 
         print("\n\n")
 
+
+        output_file_location = OUTPUT_PATH + identifier + ".json"
+        print(f"Saving output to {output_file_location}")
+
+        results = file['sarif']['runs'][0]['results']
+        c_file_location = DOWNLOAD_PATH + identifier + "/" + results[0]['locations'][0]['physicalLocation']['artifactLocation']['uri']
+        
+        with open(c_file_location, "r") as src:
+            c_file_data = src.read()
+
+        output = {}
+        output['identifier'] = identifier
+        output['results'] = results
+        output['c'] = c_file_data
+
+        with open(output_file_location, "w") as f:
+            json.dump(output, f)
+
+        print("\n\n")
+
         args = ""
         if isAsm.get() == 1:
             args += "asm "
@@ -315,6 +338,7 @@ def window():
             subprocess.run(command)
         except Exception as e:
             print(f"Erreur lors de l'exécution de run_ghidra_headless.sh: {e}")
+
         print("\n\n")
 
 

@@ -20,7 +20,7 @@ if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
 
-file_name = currentProgram.getName().split(".")[0] + ".json"
+file_name = currentProgram.getName().split(".exe")[0] + ".json"
 output_file_path = os.path.join(output_dir, file_name)
 
 
@@ -30,7 +30,16 @@ decompinterface.openProgram(currentProgram);
 listing = currentProgram.getListing()
 functions = listing.getFunctions(True)
 
-json_content = json.loads("{}")
+
+
+
+with open(output_file_path, "r") as f:
+    try:
+        json_content = json.load(f)
+        print("File {} already exists, loading it...".format(output_file_path))
+    except:
+        pass
+
 json_content["decompiled"] = json.loads("{}")
 json_content["disassembled"] = json.loads("{}")
 
