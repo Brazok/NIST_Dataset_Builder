@@ -340,6 +340,14 @@ def window():
             print(f"Erreur lors de l'exécution de run_ghidra_headless.sh: {e}")
 
         print("\n\n")
+        print("Cleaning...")
+        if os.path.exists(BIN_PATH + identifier + ".exe"):
+            os.remove(BIN_PATH + identifier + ".exe")
+        if os.path.exists(DOWNLOAD_PATH + identifier):
+            shutil.rmtree(DOWNLOAD_PATH + identifier)
+
+        print("Done for : " + identifier)
+        print("\n\n")
 
 
     print("~> window()")
